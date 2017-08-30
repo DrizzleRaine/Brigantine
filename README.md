@@ -1,4 +1,4 @@
-Pip Boy 300
+Brigandine
 =========
 
-A Pip Boy for your Pebble
+A live tide watchface for your pebble
