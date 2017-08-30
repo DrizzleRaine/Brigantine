@@ -1,0 +1,115 @@
+{
+    "author": "north-40",
+    "dependencies": {
+        "pebble-clay": "^1.0.4"
+    },
+    "keywords": [],
+    "name": "pip-boy-300",
+    "pebble": {
+        "capabilities": [
+            "location",
+            "configurable",
+            "health"
+        ],
+        "displayName": "Pip-Boy 300",
+        "enableMultiJS": true,
+        "messageKeys": [
+            "TEMPERATURE",
+            "CONDITIONS",
+            "STEPS_COUNT",
+            "SLEEP_COUNT",
+            "STEPS_TYPE",
+            "SLEEP_TYPE",
+            "CRIPPLED_STATUS",
+            "BATTERY_BREAKPOINT",
+            "DEAD_BATTERY_BREAKPOINT",
+            "STEPS_BREAKPOINT",
+            "SLEEP_BREAKPOINT",
+            "ENABLE_STEPS",
+            "ENABLE_SLEEP",
+            "ENABLE_HR"
+        ],
+        "projectType": "native",
+        "resources": {
+            "media": [
+                {
+                    "file": "images/bluetooth.png",
+                    "name": "BLUETOOTH_ICON",
+                    "targetPlatforms": null,
+                    "type": "bitmap"
+                },
+                {
+                    "file": "images/crippledH2.png",
+                    "name": "CRIPPLED_H2",
+                    "targetPlatforms": null,
+                    "type": "bitmap"
+                },
+                {
+                    "file": "images/crippledH1.png",
+                    "name": "CRIPPLED_H1",
+                    "targetPlatforms": null,
+                    "type": "bitmap"
+                },
+                {
+                    "file": "images/crippledLR.png",
+                    "name": "CRIPPLED_LR",
+                    "targetPlatforms": null,
+                    "type": "bitmap"
+                },
+                {
+                    "file": "images/crippledLL.png",
+                    "name": "CRIPPLED_LL",
+                    "targetPlatforms": null,
+                    "type": "bitmap"
+                },
+                {
+                    "file": "images/crippledAR.png",
+                    "name": "CRIPPLED_AR",
+                    "targetPlatforms": null,
+                    "type": "bitmap"
+                },
+                {
+                    "file": "images/crippledAL.png",
+                    "name": "CRIPPLED_AL",
+                    "targetPlatforms": null,
+                    "type": "bitmap"
+                },
+                {
+                    "file": "images/icon.png",
+                    "menuIcon": true,
+                    "name": "ICON",
+                    "targetPlatforms": null,
+                    "type": "bitmap"
+                },
+                {
+                    "file": "images/pipboy_bg.png",
+                    "name": "BACKGROUND",
+                    "targetPlatforms": null,
+                    "type": "bitmap"
+                },
+                {
+                    "file": "images/vault_boy.png",
+                    "name": "VAULT_BOY",
+                    "targetPlatforms": null,
+                    "type": "bitmap"
+                },
+                {
+                    "file": "images/dead.png",
+                    "name": "DEAD",
+                    "targetPlatforms": null,
+                    "type": "bitmap"
+                }
+            ]
+        },
+        "sdkVersion": "3",
+        "targetPlatforms": [
+            "basalt",
+            "diorite"
+        ],
+        "uuid": "94a19089-a7be-4efc-b852-7aaf8b8e1859",
+        "watchapp": {
+            "watchface": true
+        }
+    },
+    "version": "2.7.0"
+}
