@@ -23,7 +23,6 @@ function getTides() {
 
   var url = 'https://tidesandcurrents.noaa.gov/api/datagetter?begin_date=' + todayDate + '&end_date=' + endDate + '&station=' + stationID + '&product=predictions&datum=MLLW&units=' + units + '&interval=h&time_zone=lst_ldt&application=BrigandineWatch&format=json';
 
-	
 	// Send request to NOAA
   	xhrRequest(url, 'GET', 
     	function(responseText) {
@@ -51,13 +50,16 @@ function locationSuccess(pos) {
 	var myAPIKey = "db0f8d947d39c6e0aacbd78159e1830d";
 	var units = "imperial";
   var url = 'http://api.openweathermap.org/data/2.5/weather?lat=' + pos.coords.latitude + '&lon=' + pos.coords.longitude + '&units=' + units + '&appid=' + myAPIKey;
+	
 
   // Send request to OpenWeatherMap
   xhrRequest(url, 'GET', 
     function(responseText) {
       var json = JSON.parse(responseText);
+			//console.log(json.name);
 			
 			var dictionary_weather = {
+				'LOCATION_NAME' : json.name,
   			'TEMPERATURE': Math.round(json.main.temp),
   			'CONDITIONS': json.weather[0].main
 			};

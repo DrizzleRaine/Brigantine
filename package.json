@@ -1,17 +1,18 @@
 {
     "author": "north-40",
     "dependencies": {
+        "moment": "^2.15.1",
         "pebble-clay": "^1.0.4"
     },
     "keywords": [],
-    "name": "pip-boy-300",
+    "name": "brigandine",
     "pebble": {
         "capabilities": [
             "location",
             "configurable",
             "health"
         ],
-        "displayName": "Pip-Boy 300",
+        "displayName": "Brigandine",
         "enableMultiJS": true,
         "messageKeys": [
             "TEMPERATURE",
@@ -29,20 +30,14 @@
             "ENABLE_SLEEP",
             "ENABLE_HR",
             "TIME",
-            "TIDE"
+            "TIDE",
+            "LOCATION_NAME"
         ],
         "projectType": "native",
         "resources": {
             "media": [
                 {
-                    "file": "images/pipboy_bg.png",
-                    "name": "BACKGROUND",
-                    "targetPlatforms": null,
-                    "type": "bitmap"
-                },
-                {
                     "file": "images/icon.png",
-                    "menuIcon": true,
                     "name": "ICON",
                     "targetPlatforms": null,
                     "type": "bitmap"
@@ -60,7 +55,7 @@
             "basalt",
             "diorite"
         ],
-        "uuid": "94a19089-a7be-4efc-b852-7aaf8b8e1859",
+        "uuid": "472fdde6-603d-4b2c-a2a2-9b60566b11c2",
         "watchapp": {
             "watchface": true
         }

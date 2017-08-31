@@ -45,26 +45,25 @@ static void update_time() {
 	
 	// Write current date to buffer
 	static char date_text[20];
-	strftime(date_text, sizeof(date_text), "%m-%d-%Y", tick_time);
+	strftime(date_text, sizeof(date_text), "%m %d %Y", tick_time);
 	text_layer_set_text(s_date_layer, date_text);
 }
 
 // BATTERY UPDATE PROCESS
 static void battery_update_proc() {
-	static char s_buffer[] = "BP XXX/100";
+	static char s_buffer[] = "000";
 
 	if (s_charging) {
-		snprintf(s_buffer, sizeof(s_buffer)+1, "%s", "CHARGING");
+		snprintf(s_buffer, sizeof(s_buffer)+1, "%s", "C");
 		if (s_plugged && (s_battery_level == 100)) {
-			snprintf(s_buffer, sizeof(s_buffer)+1, "%s", "FULL");
+			snprintf(s_buffer, sizeof(s_buffer)+1, "%s", "F");
 		}
 	}
 	else {
-		snprintf(s_buffer, sizeof(s_buffer)+1, "BP %d/100", s_battery_level);
+		snprintf(s_buffer, sizeof(s_buffer)+1, "%d", s_battery_level);
 	}
 	
 	text_layer_set_text(s_battery_layer, s_buffer);
-	layer_set_hidden(s_batterybar_layer,(s_battery_level <= settings.battery_breakpoint));
 }
 
 // BATTERY HANDLER
@@ -89,20 +88,14 @@ static void bluetooth_callback(bool connected) {
 
 // HEALTH UPDATE PROCESS
 static void health_update_proc() {
-	static char s_bufferX[] = "ST  00000";
-	static char s_bufferN[] = "SG 00000";
-	static char s_bufferH[] = "000";
-
-	snprintf(s_bufferX, sizeof(s_bufferX)+1, "ST  %d",s_xp_level);
-	snprintf(s_bufferN, sizeof(s_bufferN)+1, "SG %d",s_next_level);
-	snprintf(s_bufferH, sizeof(s_bufferH)+1, "%d",s_heart_level);
+	static char s_bufferX[] = "00000";
+	static char s_bufferN[] = "00000";
+	
+	snprintf(s_bufferX, sizeof(s_bufferX)+1, "%d",s_xp_level);
+	snprintf(s_bufferN, sizeof(s_bufferN)+1, "%d:%d",s_head_level / 3600,s_head_level % 3600 / 60);
 	
 	text_layer_set_text(s_xp_layer, s_bufferX);
 	text_layer_set_text(s_nextLvl_layer, s_bufferN);
-	text_layer_set_text(s_heart_layer, s_bufferH);
-	
-	layer_set_hidden(s_stepsbar1_layer,false);
-	layer_set_hidden(s_stepsbar2_layer,false);
 }
 
 // HEALTH HANDLER
@@ -184,18 +177,6 @@ static void health_callback(HealthEventType event, void *context) {
   		APP_LOG(APP_LOG_LEVEL_ERROR, "Sleep data unavailable!");
 		}
 	}
-	
-	// Get heart rate
-	mask = health_service_metric_accessible(HealthMetricHeartRateBPM, now, now);
-	if (mask & HealthServiceAccessibilityMaskAvailable) {
-	  HealthValue val = health_service_peek_current_value(HealthMetricHeartRateBPM);
-	  if(val > 0) {
-	    s_heart_level = val;
-	  }
-		else {
-			APP_LOG(APP_LOG_LEVEL_ERROR, "Heart rate data unavailable!");
-		}
-	}
 }
 
 // JAVA ERROR LOGGING : DROPPED MESSAGE
@@ -238,6 +219,7 @@ static void inbox_received_handler(DictionaryIterator *iterator, void *context) 
 	// Read tuples for data
 	Tuple *temp_tuple = dict_find(iterator, MESSAGE_KEY_TEMPERATURE);
 	Tuple *conditions_tuple = dict_find(iterator, MESSAGE_KEY_CONDITIONS);
+	Tuple *location_tuple = dict_find(iterator, MESSAGE_KEY_LOCATION_NAME);
 
 	Tuple *t_CRIPPLED_STATUS = dict_find(iterator, MESSAGE_KEY_CRIPPLED_STATUS);
 	Tuple *t_BATTERY_BREAKPOINT = dict_find(iterator, MESSAGE_KEY_BATTERY_BREAKPOINT);
@@ -253,16 +235,19 @@ static void inbox_received_handler(DictionaryIterator *iterator, void *context) 
 	Tuple *t_ENABLE_HR = dict_find(iterator, MESSAGE_KEY_ENABLE_HR);
 	
 	// If there's weather data, process it
-	if(temp_tuple && conditions_tuple) {
+	if(temp_tuple && conditions_tuple && location_tuple) {
 		static char temperature_buffer[8];
 		static char conditions_buffer[32];
+		static char location_buffer[32];
 		static char weather_layer_buffer[32];
 
   	snprintf(temperature_buffer, sizeof(temperature_buffer)+1, "%d F", (int)temp_tuple->value->int32);
   	snprintf(conditions_buffer, sizeof(conditions_buffer)+1, "%s", conditions_tuple->value->cstring);
+  	snprintf(location_buffer, sizeof(location_buffer)+1, "%s", location_tuple->value->cstring);
 		
 		snprintf(weather_layer_buffer, sizeof(weather_layer_buffer)+1, "%s, %s", temperature_buffer, conditions_buffer);
 		text_layer_set_text(s_lvl_layer, weather_layer_buffer);
+		text_layer_set_text(s_loc_layer, location_buffer);
 	}
 	
 	bool update = false;
@@ -394,91 +379,82 @@ static void draw_bar(int width, int current, int upper, Layer *layer, GContext *
 
 // DRAW INDIVIDUAL BARS
 static void draw_batterybar(Layer *layer, GContext *ctx){
-	draw_bar(c_bar_width,s_battery_level,100,layer,ctx);
+	draw_bar(battery_bar_width,s_battery_level,100,layer,ctx);
 }
 static void draw_sleepbar(Layer *layer, GContext *ctx){
-	draw_bar(c_bar_width,s_head_level,s_headmax_level,layer,ctx);
+	draw_bar(sleep_bar_width,s_head_level,s_headmax_level,layer,ctx);
 }
-static void draw_stepsbar1(Layer *layer, GContext *ctx){
-	draw_bar(c_bar_width,s_xp_level,s_next_level,layer,ctx);
-}
-static void draw_stepsbar2(Layer *layer, GContext *ctx){
-	draw_bar(c_bar_width,s_xp_level,s_current_level,layer,ctx);
+static void draw_stepsbar(Layer *layer, GContext *ctx){
+	draw_bar(steps_bar_width,s_xp_level,s_next_level,layer,ctx);
 }
 
 // GRAPHICS LOADER
 static void graphics_loader(GRect frame) {
-	// Draw Background
-	s_background_bitmap = gbitmap_create_with_resource(RESOURCE_ID_BACKGROUND);
-	s_background_bitlayer = bitmap_layer_create(frame);
-	bitmap_layer_set_bitmap(s_background_bitlayer, s_background_bitmap);
-	
 	// Draw Bluetooth icon
 	s_bluetooth_bitmap = gbitmap_create_with_resource(RESOURCE_ID_BLUETOOTH_ICON);
 	s_bluetooth_bitlayer = bitmap_layer_create(GRect(94, 10, frame.size.w, 100));
   bitmap_layer_set_bitmap(s_bluetooth_bitlayer, s_bluetooth_bitmap);
-  bitmap_layer_set_alignment(s_bluetooth_bitlayer, GAlignLeft);
+  bitmap_layer_set_alignment(s_bluetooth_bitlayer, GAlignCenter);
 	
 	// Create Time child layer
-	s_time_layer = text_layer_create(GRect(-8, 133, frame.size.w , 34));
+	s_time_layer = text_layer_create(GRect(0, 0, frame.size.w , 36));
   text_layer_set_text_color(s_time_layer, GColorWhite);
   text_layer_set_background_color(s_time_layer, GColorClear);
-  text_layer_set_font(s_time_layer, fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD));
-  text_layer_set_text_alignment(s_time_layer, GTextAlignmentRight);
+  text_layer_set_font(s_time_layer, fonts_get_system_font(FONT_KEY_LECO_36_BOLD_NUMBERS));
+  text_layer_set_text_alignment(s_time_layer, GTextAlignmentLeft);
 	
-	// Create BP child layer (Battery Level)
-	s_battery_layer = text_layer_create(GRect(34, 4, frame.size.w, 34));
+	// Create Date child layer
+	s_date_layer = text_layer_create(GRect(0, 38, frame.size.w, 34));
+  text_layer_set_text_color(s_date_layer, GColorWhite);
+  text_layer_set_background_color(s_date_layer, GColorClear);
+  text_layer_set_font(s_date_layer, fonts_get_system_font(FONT_KEY_LECO_20_BOLD_NUMBERS));
+  text_layer_set_text_alignment(s_date_layer, GTextAlignmentCenter);
+  text_layer_set_text(s_date_layer, "1-1-2013");
+	
+	// Create battery text child layer
+	s_battery_layer = text_layer_create(GRect((battery_bar_width+2)*-1, 0, frame.size.w, 34));
   text_layer_set_text_color(s_battery_layer, GColorWhite);
   text_layer_set_background_color(s_battery_layer, GColorClear);
   text_layer_set_font(s_battery_layer, fonts_get_system_font(FONT_KEY_GOTHIC_14));
-  text_layer_set_text_alignment(s_battery_layer, GTextAlignmentCenter);
-	text_layer_set_text(s_battery_layer, "BP XXX/100");
+  text_layer_set_text_alignment(s_battery_layer, GTextAlignmentRight);
+	text_layer_set_text(s_battery_layer, "000");
 
-	// Create Date child layer
-	s_date_layer = text_layer_create(GRect(8, 4, frame.size.w, 34));
-  text_layer_set_text_color(s_date_layer, GColorWhite);
-  text_layer_set_background_color(s_date_layer, GColorClear);
-  text_layer_set_font(s_date_layer, fonts_get_system_font(FONT_KEY_GOTHIC_14));
-  text_layer_set_text_alignment(s_date_layer, GTextAlignmentLeft);
-  text_layer_set_text(s_date_layer, "1-1-2013");
-	
-	// Create XP child layer (Current Steps)
-	s_xp_layer = text_layer_create(GRect(8, 133, frame.size.w, 34));
+	// Create steps text layer
+	s_xp_layer = text_layer_create(GRect((steps_bar_width+2)*-1, 13, frame.size.w, 34));
   text_layer_set_text_color(s_xp_layer, GColorWhite);
   text_layer_set_background_color(s_xp_layer, GColorClear);
   text_layer_set_font(s_xp_layer, fonts_get_system_font(FONT_KEY_GOTHIC_14));
-  text_layer_set_text_alignment(s_xp_layer, GTextAlignmentLeft);
-  text_layer_set_text(s_xp_layer, "STEPS:");
+  text_layer_set_text_alignment(s_xp_layer, GTextAlignmentRight);
+  text_layer_set_text(s_xp_layer, "00000");
 	
-	// Create Next Level child layer (Average of last week's steps)
-	s_nextLvl_layer = text_layer_create(GRect(8, 146, frame.size.w, 34));
+	// Create sleep text layer
+	s_nextLvl_layer = text_layer_create(GRect((sleep_bar_width+2)*-1, 26, frame.size.w, 34));
   text_layer_set_text_color(s_nextLvl_layer, GColorWhite);
   text_layer_set_background_color(s_nextLvl_layer, GColorClear);
   text_layer_set_font(s_nextLvl_layer, fonts_get_system_font(FONT_KEY_GOTHIC_14));
-  text_layer_set_text_alignment(s_nextLvl_layer, GTextAlignmentLeft);
-  text_layer_set_text(s_nextLvl_layer, "GOAL:");
+  text_layer_set_text_alignment(s_nextLvl_layer, GTextAlignmentRight);
+  text_layer_set_text(s_nextLvl_layer, "00000");
 		
-	// Create Level child layer (live weather)
-	s_lvl_layer = text_layer_create(GRect(0, 121, frame.size.w, 34));
+	// Create weather child layer
+	s_loc_layer = text_layer_create(GRect(0, 59, frame.size.w, 34));
+  text_layer_set_text_color(s_loc_layer, GColorWhite);
+  text_layer_set_background_color(s_loc_layer, GColorClear);
+  text_layer_set_font(s_loc_layer, fonts_get_system_font(FONT_KEY_GOTHIC_14));
+  text_layer_set_text_alignment(s_loc_layer, GTextAlignmentCenter);
+	text_layer_set_text(s_loc_layer, "Location");
+	
+	// Create weather child layer
+	s_lvl_layer = text_layer_create(GRect(0, 71, frame.size.w, 34));
   text_layer_set_text_color(s_lvl_layer, GColorWhite);
   text_layer_set_background_color(s_lvl_layer, GColorClear);
   text_layer_set_font(s_lvl_layer, fonts_get_system_font(FONT_KEY_GOTHIC_14));
   text_layer_set_text_alignment(s_lvl_layer, GTextAlignmentCenter);
-	text_layer_set_text(s_lvl_layer, "Level 1");
-	
-	// Create Heart child layer
-	s_heart_layer = text_layer_create(GRect(0, 64, frame.size.w, 34));
-  text_layer_set_text_color(s_heart_layer, GColorWhite);
-  text_layer_set_background_color(s_heart_layer, GColorClear);
-  text_layer_set_font(s_heart_layer, fonts_get_system_font(FONT_KEY_GOTHIC_14));
-  text_layer_set_text_alignment(s_heart_layer, GTextAlignmentCenter);
-	text_layer_set_text(s_heart_layer, "000");
-	
+	text_layer_set_text(s_lvl_layer, "Temp and Conditions");
+
 	// Create bar layers
-	s_batterybar_layer = layer_create(GRect(24, 54, 25, 5));
-	s_sleepbar_layer = layer_create(GRect(63, 29, 25, 5));
-	s_stepsbar1_layer = layer_create(GRect(28, 96, 25, 5));
-	s_stepsbar2_layer = layer_create(GRect(94, 96, 25, 5));
+	s_batterybar_layer = layer_create(GRect(frame.size.w-battery_bar_width, 5, battery_bar_width, 9));
+	s_stepsbar_layer = layer_create(GRect(frame.size.w-steps_bar_width, 18, steps_bar_width, 9));
+	s_sleepbar_layer = layer_create(GRect(frame.size.w-sleep_bar_width, 31, sleep_bar_width, 9));
 }
 
 // WINDOW : LOAD
@@ -494,17 +470,13 @@ static void main_window_load(Window *window) {
 	s_canvas_layer = layer_create(frame);
 	graphics_loader(frame);  
 	
-	layer_add_child(window_layer, bitmap_layer_get_layer(s_background_bitlayer));
-
 	layer_add_child(s_canvas_layer, s_batterybar_layer);
 	layer_add_child(s_canvas_layer, s_sleepbar_layer);
-	layer_add_child(s_canvas_layer, s_stepsbar1_layer);
-	layer_add_child(s_canvas_layer, s_stepsbar2_layer);
+	layer_add_child(s_canvas_layer, s_stepsbar_layer);
 	
 	layer_set_update_proc(s_batterybar_layer, draw_batterybar);
 	layer_set_update_proc(s_sleepbar_layer, draw_sleepbar);
-	layer_set_update_proc(s_stepsbar1_layer, draw_stepsbar1);
-	layer_set_update_proc(s_stepsbar2_layer, draw_stepsbar2);
+	layer_set_update_proc(s_stepsbar_layer, draw_stepsbar);
 	
 	layer_add_child(s_canvas_layer, bitmap_layer_get_layer(s_bluetooth_bitlayer));
 
@@ -514,7 +486,7 @@ static void main_window_load(Window *window) {
 	layer_add_child(window_layer, text_layer_get_layer(s_xp_layer)); // Current steps
 	layer_add_child(window_layer, text_layer_get_layer(s_nextLvl_layer)); // Weekly step average
 	layer_add_child(window_layer, text_layer_get_layer(s_lvl_layer)); // Weather
-	layer_add_child(window_layer, text_layer_get_layer(s_heart_layer)); // Heart rate
+	layer_add_child(window_layer, text_layer_get_layer(s_loc_layer)); // Weather
 	
 	layer_add_child(window_layer, s_canvas_layer);
 	
@@ -524,7 +496,6 @@ static void main_window_load(Window *window) {
 
 // WINDOW : UNLOAD
 static void main_window_unload(Window *window) {
-	gbitmap_destroy(s_background_bitmap);
 	gbitmap_destroy(s_bluetooth_bitmap);
 	
 	bitmap_layer_destroy(s_background_bitlayer);
@@ -536,12 +507,11 @@ static void main_window_unload(Window *window) {
 	text_layer_destroy(s_xp_layer);
 	text_layer_destroy(s_nextLvl_layer);
 	text_layer_destroy(s_lvl_layer);
-	text_layer_destroy(s_heart_layer);
+	text_layer_destroy(s_loc_layer);
 	
 	layer_destroy(s_batterybar_layer);
 	layer_destroy(s_sleepbar_layer);
-	layer_destroy(s_stepsbar1_layer);
-	layer_destroy(s_stepsbar2_layer);
+	layer_destroy(s_stepsbar_layer);
 	
 	layer_destroy(s_canvas_layer);
 }
@@ -561,7 +531,6 @@ static void init(void) {
 	s_next_level = settings.steps_count;
 	s_head_level = 0;
 	s_headmax_level = settings.sleep_count;
-	s_heart_level = 0;
 	
 	// Subscribe to services
   battery_state_service_subscribe(battery_callback);
