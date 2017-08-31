@@ -1,5 +1,4 @@
-// Pip Boy 100 Copyright 2013 Bert de Ruiter (www.bertderuiter.nl/)
-// Pip Boy 300 Copyright 2017 nem0 (www.north-40.net)
+// Brigandine Copyright 2017 nem0 (www.north-40.net)
 
 // INCLUDES
 #include "config.h"
@@ -9,7 +8,6 @@ ClaySettings settings;
 // DEFAULT SETTINGS
 static void config_default_settings() {
 	// Step/Sleep Type Key: 0 = past day, 1 = avg of today's weekday, 2 = avg past week, 3  = avg past month, 4 = manual
-	settings.crippled_status = true;
 	settings.battery_breakpoint = 30;
 	settings.dead_battery_breakpoint = 10;
 	settings.steps_breakpoint = 50;
@@ -67,17 +65,6 @@ static void battery_update_proc() {
 	
 	text_layer_set_text(s_battery_layer, s_buffer);
 	layer_set_hidden(s_batterybar_layer,(s_battery_level <= settings.battery_breakpoint));
-	layer_set_hidden(bitmap_layer_get_layer(s_crippledAL_bitlayer),true);
-	layer_set_hidden(bitmap_layer_get_layer(s_dead_bitlayer),true);
-
-	// Cripple arm if battery drops below breakpoint
-	if (settings.crippled_status) {
-		layer_set_hidden(bitmap_layer_get_layer(s_crippledAL_bitlayer),!layer_get_hidden(s_batterybar_layer));
-	}
-	// Kill Vault Boy if battery drops below dead breakpoint
-	if (s_battery_level <= settings.dead_battery_breakpoint) {
-		layer_set_hidden(bitmap_layer_get_layer(s_dead_bitlayer),false);
-	}
 }
 
 // BATTERY HANDLER
@@ -93,10 +80,6 @@ static void bluetooth_update_proc() {
 		vibes_double_pulse();
 	}
 	layer_set_hidden(bitmap_layer_get_layer(s_bluetooth_bitlayer),!s_connected);
-	layer_set_hidden(bitmap_layer_get_layer(s_crippledAR_bitlayer),true);
-	if (settings.crippled_status) {
-		layer_set_hidden(bitmap_layer_get_layer(s_crippledAR_bitlayer),!layer_get_hidden(bitmap_layer_get_layer(s_bluetooth_bitlayer)));		
-	}
 }
 
 // BLUETOOTH HANDLER
@@ -120,19 +103,6 @@ static void health_update_proc() {
 	
 	layer_set_hidden(s_stepsbar1_layer,false);
 	layer_set_hidden(s_stepsbar2_layer,false);
-	layer_set_hidden(bitmap_layer_get_layer(s_crippledLL_bitlayer),true);
-	layer_set_hidden(bitmap_layer_get_layer(s_crippledLR_bitlayer),true);
-	layer_set_hidden(bitmap_layer_get_layer(s_crippledH1_bitlayer),true);
-	layer_set_hidden(bitmap_layer_get_layer(s_crippledH2_bitlayer),true);
-	
-	if (settings.crippled_status) {
-		layer_set_hidden(s_stepsbar1_layer,(s_xp_level < (s_next_level*(settings.steps_breakpoint/10)/10)));
-		layer_set_hidden(s_stepsbar2_layer,(s_xp_level < (s_current_level*(settings.steps_breakpoint/10)/10)));
-		layer_set_hidden(bitmap_layer_get_layer(s_crippledLL_bitlayer),!layer_get_hidden(s_stepsbar1_layer));
-		layer_set_hidden(bitmap_layer_get_layer(s_crippledLR_bitlayer),!layer_get_hidden(s_stepsbar2_layer));
-		layer_set_hidden(bitmap_layer_get_layer(s_crippledH1_bitlayer),(s_head_level > s_headmax_level));
-		layer_set_hidden(bitmap_layer_get_layer(s_crippledH2_bitlayer),((s_head_level*settings.sleep_breakpoint) >= s_headmax_level));
-	}
 }
 
 // HEALTH HANDLER
@@ -443,59 +413,11 @@ static void graphics_loader(GRect frame) {
 	s_background_bitlayer = bitmap_layer_create(frame);
 	bitmap_layer_set_bitmap(s_background_bitlayer, s_background_bitmap);
 	
-	// Draw Vault Boy
-	s_vaultBoy_bitmap = gbitmap_create_with_resource(RESOURCE_ID_VAULT_BOY);
-	s_vaultBoy_bitlayer = bitmap_layer_create(GRect(3, 26, frame.size.w, 100));
-  bitmap_layer_set_bitmap(s_vaultBoy_bitlayer, s_vaultBoy_bitmap);
-  bitmap_layer_set_alignment(s_vaultBoy_bitlayer, GAlignCenter);
-	
-	// Draw Vault Boy's Damaged Head (Under par sleep)
-	s_crippledH1_bitmap = gbitmap_create_with_resource(RESOURCE_ID_CRIPPLED_H1);
-	s_crippledH1_bitlayer = bitmap_layer_create(GRect(3, 1, frame.size.w, 100));
-  bitmap_layer_set_bitmap(s_crippledH1_bitlayer, s_crippledH1_bitmap);
-  bitmap_layer_set_alignment(s_crippledH1_bitlayer, GAlignCenter);
-	
-	// Draw Vault Boy's Crippled Head (Really under par sleep)
-	s_crippledH2_bitmap = gbitmap_create_with_resource(RESOURCE_ID_CRIPPLED_H2);
-	s_crippledH2_bitlayer = bitmap_layer_create(GRect(3, -4, frame.size.w, 100));
-  bitmap_layer_set_bitmap(s_crippledH2_bitlayer, s_crippledH2_bitmap);
-  bitmap_layer_set_alignment(s_crippledH2_bitlayer, GAlignCenter);
-	
-	// Draw Crippled Arm (Left) (Battery <30%)
-	s_crippledAL_bitmap = gbitmap_create_with_resource(RESOURCE_ID_CRIPPLED_AL);
-	s_crippledAL_bitlayer = bitmap_layer_create(GRect(30, 18, frame.size.w, 100));
-  bitmap_layer_set_bitmap(s_crippledAL_bitlayer, s_crippledAL_bitmap);
-  bitmap_layer_set_alignment(s_crippledAL_bitlayer, GAlignLeft);
-	
-	// Draw Crippled Arm (Right) (Bluetooth Indictor)
-	s_crippledAR_bitmap = gbitmap_create_with_resource(RESOURCE_ID_CRIPPLED_AR);
-	s_crippledAR_bitlayer = bitmap_layer_create(GRect(86, 19, frame.size.w, 100));
-  bitmap_layer_set_bitmap(s_crippledAR_bitlayer, s_crippledAR_bitmap);
-  bitmap_layer_set_alignment(s_crippledAR_bitlayer, GAlignLeft);
-	
-	// Draw Crippled Leg (Left) (Less than the weekly average steps)
-	s_crippledLL_bitmap = gbitmap_create_with_resource(RESOURCE_ID_CRIPPLED_LL);
-	s_crippledLL_bitlayer = bitmap_layer_create(GRect(34, 60, frame.size.w, 100));
-  bitmap_layer_set_bitmap(s_crippledLL_bitlayer, s_crippledLL_bitmap);
-  bitmap_layer_set_alignment(s_crippledLL_bitlayer, GAlignLeft);
-	
-	// Draw Crippled Leg (Right) (Less than half the weekly average steps)
-	s_crippledLR_bitmap = gbitmap_create_with_resource(RESOURCE_ID_CRIPPLED_LR);
-	s_crippledLR_bitlayer = bitmap_layer_create(GRect(72, 60, frame.size.w, 100));
-  bitmap_layer_set_bitmap(s_crippledLR_bitlayer, s_crippledLR_bitmap);
-  bitmap_layer_set_alignment(s_crippledLR_bitlayer, GAlignLeft);
-	
 	// Draw Bluetooth icon
 	s_bluetooth_bitmap = gbitmap_create_with_resource(RESOURCE_ID_BLUETOOTH_ICON);
 	s_bluetooth_bitlayer = bitmap_layer_create(GRect(94, 10, frame.size.w, 100));
   bitmap_layer_set_bitmap(s_bluetooth_bitlayer, s_bluetooth_bitmap);
   bitmap_layer_set_alignment(s_bluetooth_bitlayer, GAlignLeft);
-	
-	// Draw Dead Vault Boy (Battery super low)
-	s_dead_bitmap = gbitmap_create_with_resource(RESOURCE_ID_DEAD);
-	s_dead_bitlayer = bitmap_layer_create(GRect(3, 26, frame.size.w, 100));
-  bitmap_layer_set_bitmap(s_dead_bitlayer, s_dead_bitmap);
-  bitmap_layer_set_alignment(s_dead_bitlayer, GAlignCenter);
 	
 	// Create Time child layer
 	s_time_layer = text_layer_create(GRect(-8, 133, frame.size.w , 34));
@@ -526,7 +448,7 @@ static void graphics_loader(GRect frame) {
   text_layer_set_background_color(s_xp_layer, GColorClear);
   text_layer_set_font(s_xp_layer, fonts_get_system_font(FONT_KEY_GOTHIC_14));
   text_layer_set_text_alignment(s_xp_layer, GTextAlignmentLeft);
-  text_layer_set_text(s_xp_layer, "ST  XXXXX");
+  text_layer_set_text(s_xp_layer, "STEPS:");
 	
 	// Create Next Level child layer (Average of last week's steps)
 	s_nextLvl_layer = text_layer_create(GRect(8, 146, frame.size.w, 34));
@@ -534,7 +456,7 @@ static void graphics_loader(GRect frame) {
   text_layer_set_background_color(s_nextLvl_layer, GColorClear);
   text_layer_set_font(s_nextLvl_layer, fonts_get_system_font(FONT_KEY_GOTHIC_14));
   text_layer_set_text_alignment(s_nextLvl_layer, GTextAlignmentLeft);
-  text_layer_set_text(s_nextLvl_layer, "SG XXXXX");
+  text_layer_set_text(s_nextLvl_layer, "GOAL:");
 		
 	// Create Level child layer (live weather)
 	s_lvl_layer = text_layer_create(GRect(0, 121, frame.size.w, 34));
@@ -573,7 +495,6 @@ static void main_window_load(Window *window) {
 	graphics_loader(frame);  
 	
 	layer_add_child(window_layer, bitmap_layer_get_layer(s_background_bitlayer));
-  layer_add_child(window_layer, bitmap_layer_get_layer(s_vaultBoy_bitlayer));
 
 	layer_add_child(s_canvas_layer, s_batterybar_layer);
 	layer_add_child(s_canvas_layer, s_sleepbar_layer);
@@ -585,13 +506,6 @@ static void main_window_load(Window *window) {
 	layer_set_update_proc(s_stepsbar1_layer, draw_stepsbar1);
 	layer_set_update_proc(s_stepsbar2_layer, draw_stepsbar2);
 	
-	layer_add_child(s_canvas_layer, bitmap_layer_get_layer(s_crippledAR_bitlayer));
-	layer_add_child(s_canvas_layer, bitmap_layer_get_layer(s_crippledAL_bitlayer));
-	layer_add_child(s_canvas_layer, bitmap_layer_get_layer(s_crippledLR_bitlayer));
-	layer_add_child(s_canvas_layer, bitmap_layer_get_layer(s_crippledLL_bitlayer));
-	layer_add_child(s_canvas_layer, bitmap_layer_get_layer(s_crippledH1_bitlayer));
-	layer_add_child(s_canvas_layer, bitmap_layer_get_layer(s_crippledH2_bitlayer));
-	layer_add_child(s_canvas_layer, bitmap_layer_get_layer(s_dead_bitlayer));
 	layer_add_child(s_canvas_layer, bitmap_layer_get_layer(s_bluetooth_bitlayer));
 
 	layer_add_child(window_layer, text_layer_get_layer(s_time_layer));
@@ -611,25 +525,9 @@ static void main_window_load(Window *window) {
 // WINDOW : UNLOAD
 static void main_window_unload(Window *window) {
 	gbitmap_destroy(s_background_bitmap);
-	gbitmap_destroy(s_vaultBoy_bitmap);
-	gbitmap_destroy(s_crippledAL_bitmap);
-	gbitmap_destroy(s_crippledAR_bitmap);
-	gbitmap_destroy(s_crippledLL_bitmap);
-	gbitmap_destroy(s_crippledLR_bitmap);
-	gbitmap_destroy(s_crippledH1_bitmap);
-	gbitmap_destroy(s_crippledH2_bitmap);
-	gbitmap_destroy(s_dead_bitmap);
 	gbitmap_destroy(s_bluetooth_bitmap);
 	
 	bitmap_layer_destroy(s_background_bitlayer);
-	bitmap_layer_destroy(s_vaultBoy_bitlayer);
-	bitmap_layer_destroy(s_crippledAL_bitlayer);
-	bitmap_layer_destroy(s_crippledAR_bitlayer);
-	bitmap_layer_destroy(s_crippledLL_bitlayer);
-	bitmap_layer_destroy(s_crippledLR_bitlayer);
-	bitmap_layer_destroy(s_crippledH1_bitlayer);
-	bitmap_layer_destroy(s_crippledH2_bitlayer);
-	bitmap_layer_destroy(s_dead_bitlayer);
 	bitmap_layer_destroy(s_bluetooth_bitlayer);
 
   text_layer_destroy(s_time_layer);

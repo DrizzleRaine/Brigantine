@@ -27,50 +27,16 @@
             "SLEEP_BREAKPOINT",
             "ENABLE_STEPS",
             "ENABLE_SLEEP",
-            "ENABLE_HR"
+            "ENABLE_HR",
+            "TIME",
+            "TIDE"
         ],
         "projectType": "native",
         "resources": {
             "media": [
                 {
-                    "file": "images/bluetooth.png",
-                    "name": "BLUETOOTH_ICON",
-                    "targetPlatforms": null,
-                    "type": "bitmap"
-                },
-                {
-                    "file": "images/crippledH2.png",
-                    "name": "CRIPPLED_H2",
-                    "targetPlatforms": null,
-                    "type": "bitmap"
-                },
-                {
-                    "file": "images/crippledH1.png",
-                    "name": "CRIPPLED_H1",
-                    "targetPlatforms": null,
-                    "type": "bitmap"
-                },
-                {
-                    "file": "images/crippledLR.png",
-                    "name": "CRIPPLED_LR",
-                    "targetPlatforms": null,
-                    "type": "bitmap"
-                },
-                {
-                    "file": "images/crippledLL.png",
-                    "name": "CRIPPLED_LL",
-                    "targetPlatforms": null,
-                    "type": "bitmap"
-                },
-                {
-                    "file": "images/crippledAR.png",
-                    "name": "CRIPPLED_AR",
-                    "targetPlatforms": null,
-                    "type": "bitmap"
-                },
-                {
-                    "file": "images/crippledAL.png",
-                    "name": "CRIPPLED_AL",
+                    "file": "images/pipboy_bg.png",
+                    "name": "BACKGROUND",
                     "targetPlatforms": null,
                     "type": "bitmap"
                 },
@@ -82,20 +48,8 @@
                     "type": "bitmap"
                 },
                 {
-                    "file": "images/pipboy_bg.png",
-                    "name": "BACKGROUND",
-                    "targetPlatforms": null,
-                    "type": "bitmap"
-                },
-                {
-                    "file": "images/vault_boy.png",
-                    "name": "VAULT_BOY",
-                    "targetPlatforms": null,
-                    "type": "bitmap"
-                },
-                {
-                    "file": "images/dead.png",
-                    "name": "DEAD",
+                    "file": "images/bluetooth.png",
+                    "name": "BLUETOOTH_ICON",
                     "targetPlatforms": null,
                     "type": "bitmap"
                 }

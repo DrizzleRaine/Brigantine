@@ -12,6 +12,40 @@ var xhrRequest = function (url, type, callback) {
   xhr.send();
 };
 
+function getTides() {
+ 	// Construct URL
+	var todayDate = "20170830";
+	var endDate = "20170831";
+	//var todayDate = moment().format('YYYYMMDD');
+	//var endDate = moment()+1.format('YYYMMDD');
+	var units = "english";
+  var stationID = "9437540"; // Garibaldi, OR
+
+  var url = 'https://tidesandcurrents.noaa.gov/api/datagetter?begin_date=' + todayDate + '&end_date=' + endDate + '&station=' + stationID + '&product=predictions&datum=MLLW&units=' + units + '&interval=h&time_zone=lst_ldt&application=BrigandineWatch&format=json';
+
+	
+	// Send request to NOAA
+  	xhrRequest(url, 'GET', 
+    	function(responseText) {
+      	var json = JSON.parse(responseText);
+			
+				var dictionary_tides = {
+					'TIME' : json.predictions[0].t,
+					'TIDE' : json.predictions[0].v
+			};
+								
+			console.log("Tide time: " + dictionary_tides.TIME + " Tide height: " + dictionary_tides.TIDE);
+
+			Pebble.sendAppMessage(dictionary_tides,
+  			function(e) {
+    			//console.log('Tide info from sent to Pebble successfully!');
+  			},
+  			function(e) {
+    			console.log('Error sending tide info to Pebble!');
+  			});
+    });
+}
+
 function locationSuccess(pos) {
   // Construct URL
 	var myAPIKey = "db0f8d947d39c6e0aacbd78159e1830d";
@@ -54,5 +88,6 @@ function getWeather() {
 Pebble.addEventListener('ready', 
   function(e) {
     getWeather();
+		getTides();
   }
 );
