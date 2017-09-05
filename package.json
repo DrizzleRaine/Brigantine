@@ -5,14 +5,14 @@
         "pebble-clay": "^1.0.4"
     },
     "keywords": [],
-    "name": "brigandine",
+    "name": "brigantine",
     "pebble": {
         "capabilities": [
             "location",
             "configurable",
             "health"
         ],
-        "displayName": "Brigandine",
+        "displayName": "Brigantine",
         "enableMultiJS": true,
         "messageKeys": [
             "TEMPERATURE",
@@ -21,16 +21,9 @@
             "SLEEP_COUNT",
             "STEPS_TYPE",
             "SLEEP_TYPE",
-            "CRIPPLED_STATUS",
-            "BATTERY_BREAKPOINT",
-            "DEAD_BATTERY_BREAKPOINT",
-            "STEPS_BREAKPOINT",
-            "SLEEP_BREAKPOINT",
             "ENABLE_STEPS",
             "ENABLE_SLEEP",
-            "ENABLE_HR",
-            "TIME",
-            "TIDE",
+            "TIDES",
             "LOCATION_NAME"
         ],
         "projectType": "native",
@@ -52,6 +45,7 @@
         },
         "sdkVersion": "3",
         "targetPlatforms": [
+            "aplite",
             "basalt",
             "diorite"
         ],

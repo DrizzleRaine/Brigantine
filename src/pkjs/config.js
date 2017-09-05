@@ -1,68 +1,14 @@
 module.exports = [
   {
     "type": "heading",
-    "defaultValue": "Pip-Boy 300 Configuration"
+    "defaultValue": "Brigantine Configuration"
   },
   {
     "type": "text",
-    "defaultValue": "Remember - your Pip-Boy is not a toy. Proper cleaning and maintenance will ensure its operation for this and future generations."
+    "defaultValue": "Mahalo."
   },
-
-	{
-    "type": "section",
-    "items": [
-			{
-      	"type": "heading",
-      	"defaultValue": "Anxiety Mode"
-    	},
-			{
-				"type": "text",
-				"defaultValue": "If you feel up for it, choose the point where your Vault Boy's limbs are crippled. When a stat drops below the percentage indicated, you'd better hope you've got some stimpaks nearby."
-			},
-			{
-  			"type": "toggle",
-  			"messageKey": "CRIPPLED_STATUS",
-  			"label": "Show crippled status?",
-  			"defaultValue": 0
-			},
-			{
-		  	"type": "slider",
- 		  	"messageKey": "BATTERY_BREAKPOINT",
-				"label": "Battery Low:",
-  			"defaultValue": 30,
-  			"min": 10,
-  			"max": 90,
-  			"step": 10
-			},
-			{
-		  	"type": "slider",
- 		  	"messageKey": "DEAD_BATTERY_BREAKPOINT",
-				"label": "Battery Dead:",
-  			"defaultValue": 10,
-  			"min": 10,
-  			"max": 90,
- 				"step": 10
-			},
-			{
-		  	"type": "slider",
- 		  	"messageKey": "STEPS_BREAKPOINT",
-				"label": "Steps Percentage:",
-  			"defaultValue": 50,
-  			"min": 10,
-  			"max": 90,
-  			"step": 10
-			},
-			{
-		  	"type": "slider",
- 		  	"messageKey": "SLEEP_BREAKPOINT",
-				"label": "Sleep Percentage:",
-  			"defaultValue": 80,
-  			"min": 10,
-  			"max": 90,
-  			"step": 10
-			}
-	]},
 	
+// STEPS SECTION	
 	{
     "type": "section",
 		"capabilities": ["HEALTH"],
@@ -117,7 +63,7 @@ module.exports = [
 				}
 	]},
 	
-	
+// SLEEP SECTION	
   {
     "type": "section",
 		"capabilities": ["HEALTH"],
@@ -169,23 +115,8 @@ module.exports = [
   				"step": 1
 				}
 	]},	
-		
-  {
-    "type": "section",
-		"capabilities": ["HEALTH"],
-    "items": [
-			{
-      	"type": "heading",
-      	"defaultValue": "Heart Rate Tracking"
-    	},
-			{
-  			"type": "toggle",
-  			"messageKey": "ENABLE_HR",
-  			"label": "Enable heart rate tracking?",
-  			"defaultValue": 1
-			}
-	]},
 	
+// SUBMIT	
   {
     "type": "submit",
     "defaultValue": "Save Settings"

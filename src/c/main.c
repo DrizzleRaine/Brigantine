@@ -1,4 +1,4 @@
-// Brigandine Copyright 2017 nem0 (www.north-40.net)
+// Brigantine Copyright 2017 nem0 (www.north-40.net)
 
 // INCLUDES
 #include "config.h"
@@ -8,17 +8,16 @@ ClaySettings settings;
 // DEFAULT SETTINGS
 static void config_default_settings() {
 	// Step/Sleep Type Key: 0 = past day, 1 = avg of today's weekday, 2 = avg past week, 3  = avg past month, 4 = manual
-	settings.battery_breakpoint = 30;
-	settings.dead_battery_breakpoint = 10;
-	settings.steps_breakpoint = 50;
-	settings.sleep_breakpoint = 80;
 	settings.enableSteps = true;
   settings.steps_type = 1;
   settings.steps_count = 10000;
 	settings.enableSleep = 1;
   settings.sleep_type = 1;
   settings.sleep_count = 7;
-	settings.enableHR = true;
+	for (int s=0; s<24; s++) {
+		settings.tides_storage[s] = 0;
+	}
+	settings.updated = false;
 }
 
 // SAVE PERSISTENT SETTINGS
@@ -43,10 +42,22 @@ static void update_time() {
   strftime(s_buffer, sizeof(s_buffer), clock_is_24h_style() ? "%H:%M" : "%I:%M", tick_time);
   text_layer_set_text(s_time_layer, s_buffer);
 	
+	// Write day into buffer
+	static char day_text[32];
+	strftime(day_text, sizeof(day_text), "%A", tick_time);
+  text_layer_set_text(s_day_layer, day_text);
+	
 	// Write current date to buffer
 	static char date_text[20];
-	strftime(date_text, sizeof(date_text), "%m %d %Y", tick_time);
+	strftime(date_text, sizeof(date_text), "%m-%d-%Y", tick_time);
 	text_layer_set_text(s_date_layer, date_text);
+	
+	// Get current date formatted for NOAA to reduce polling to the API
+	if (!settings.updated) {
+		strftime(settings.last_poll, sizeof(settings.last_poll), "%Y%m%d", tick_time);
+	}
+	strftime(s_last_poll, sizeof(s_last_poll), "%Y%m%d", tick_time);	
+	APP_LOG(APP_LOG_LEVEL_DEBUG, "Last poll: %s",settings.last_poll);
 }
 
 // BATTERY UPDATE PROCESS
@@ -88,18 +99,25 @@ static void bluetooth_callback(bool connected) {
 
 // HEALTH UPDATE PROCESS
 static void health_update_proc() {
+	#if defined(PBL_HEALTH)
 	static char s_bufferX[] = "00000";
 	static char s_bufferN[] = "00000";
 	
 	snprintf(s_bufferX, sizeof(s_bufferX)+1, "%d",s_xp_level);
-	snprintf(s_bufferN, sizeof(s_bufferN)+1, "%d:%d",s_head_level / 3600,s_head_level % 3600 / 60);
-	
+	if (s_head_level % 3600 / 60 < 10) {
+		snprintf(s_bufferN, sizeof(s_bufferN)+1, "%d:0%d",s_head_level / 3600,s_head_level % 3600 / 60);		
+	}
+	else {
+		snprintf(s_bufferN, sizeof(s_bufferN)+1, "%d:%d",s_head_level / 3600,s_head_level % 3600 / 60);
+	}
 	text_layer_set_text(s_xp_layer, s_bufferX);
 	text_layer_set_text(s_nextLvl_layer, s_bufferN);
+	#endif
 }
 
 // HEALTH HANDLER
 static void health_callback(HealthEventType event, void *context) {	
+	#if defined(PBL_HEALTH)
 	HealthMetric step_metric = HealthMetricStepCount;
 	HealthMetric sleep_metric = HealthMetricSleepSeconds;
 	HealthServiceAccessibilityMask mask;
@@ -177,6 +195,7 @@ static void health_callback(HealthEventType event, void *context) {
   		APP_LOG(APP_LOG_LEVEL_ERROR, "Sleep data unavailable!");
 		}
 	}
+	#endif
 }
 
 // JAVA ERROR LOGGING : DROPPED MESSAGE
@@ -220,19 +239,15 @@ static void inbox_received_handler(DictionaryIterator *iterator, void *context) 
 	Tuple *temp_tuple = dict_find(iterator, MESSAGE_KEY_TEMPERATURE);
 	Tuple *conditions_tuple = dict_find(iterator, MESSAGE_KEY_CONDITIONS);
 	Tuple *location_tuple = dict_find(iterator, MESSAGE_KEY_LOCATION_NAME);
+	
+	Tuple *t_TIDES = dict_find(iterator, MESSAGE_KEY_TIDES);
 
-	Tuple *t_CRIPPLED_STATUS = dict_find(iterator, MESSAGE_KEY_CRIPPLED_STATUS);
-	Tuple *t_BATTERY_BREAKPOINT = dict_find(iterator, MESSAGE_KEY_BATTERY_BREAKPOINT);
-	Tuple *t_DEAD_BATTERY_BREAKPOINT = dict_find(iterator, MESSAGE_KEY_DEAD_BATTERY_BREAKPOINT);
-	Tuple *t_STEPS_BREAKPOINT = dict_find(iterator, MESSAGE_KEY_STEPS_BREAKPOINT);
-	Tuple *t_SLEEP_BREAKPOINT = dict_find(iterator, MESSAGE_KEY_SLEEP_BREAKPOINT);
 	Tuple *t_ENABLE_STEPS = dict_find(iterator, MESSAGE_KEY_ENABLE_STEPS);
  	Tuple *t_STEPS_TYPE = dict_find(iterator, MESSAGE_KEY_STEPS_TYPE);
 	Tuple *t_STEPS_COUNT = dict_find(iterator, MESSAGE_KEY_STEPS_COUNT);
 	Tuple *t_ENABLE_SLEEP = dict_find(iterator, MESSAGE_KEY_ENABLE_SLEEP);
  	Tuple *t_SLEEP_TYPE = dict_find(iterator, MESSAGE_KEY_SLEEP_TYPE);
 	Tuple *t_SLEEP_COUNT = dict_find(iterator, MESSAGE_KEY_SLEEP_COUNT);
-	Tuple *t_ENABLE_HR = dict_find(iterator, MESSAGE_KEY_ENABLE_HR);
 	
 	// If there's weather data, process it
 	if(temp_tuple && conditions_tuple && location_tuple) {
@@ -251,24 +266,10 @@ static void inbox_received_handler(DictionaryIterator *iterator, void *context) 
 	}
 	
 	bool update = false;
-	if (t_CRIPPLED_STATUS || t_BATTERY_BREAKPOINT || t_DEAD_BATTERY_BREAKPOINT || t_STEPS_BREAKPOINT || t_SLEEP_BREAKPOINT || t_ENABLE_STEPS || t_STEPS_TYPE || t_STEPS_COUNT || t_ENABLE_SLEEP || t_SLEEP_TYPE || t_SLEEP_COUNT || t_ENABLE_HR) {update = true;}
+	
+	if (t_ENABLE_STEPS || t_STEPS_TYPE || t_STEPS_COUNT || t_ENABLE_SLEEP || t_SLEEP_TYPE || t_SLEEP_COUNT) {update = true;}
 
 	// If there's config data, use it
-	if (t_CRIPPLED_STATUS){
-		settings.crippled_status = (bool)t_CRIPPLED_STATUS->value->int8;
-	}
-	if (t_BATTERY_BREAKPOINT) {
-		settings.battery_breakpoint = (int)t_BATTERY_BREAKPOINT->value->int32;
-	}
-	if (t_DEAD_BATTERY_BREAKPOINT) {
-		settings.dead_battery_breakpoint = (int)t_DEAD_BATTERY_BREAKPOINT->value->int32;
-	}
-	if (t_STEPS_BREAKPOINT) {
-		settings.steps_breakpoint = (int)t_STEPS_BREAKPOINT->value->int32;
-	}
-	if (t_SLEEP_BREAKPOINT) {
-		settings.sleep_breakpoint = (int)t_SLEEP_BREAKPOINT->value->int32;
-	}
 	if (t_ENABLE_STEPS){
 		settings.enableSteps = (bool)t_ENABLE_STEPS->value->int8;
 	}
@@ -291,18 +292,33 @@ static void inbox_received_handler(DictionaryIterator *iterator, void *context) 
 			settings.sleep_count = (int)t_SLEEP_COUNT->value->int32;
 		}
 	}
-	if (t_ENABLE_HR){
-		settings.enableHR = (bool)t_ENABLE_HR->value->int8;
+
+	if (t_TIDES && !settings.updated) {
+		static char tides_buffer[49];
+		
+		snprintf(tides_buffer, sizeof(tides_buffer), "%s", t_TIDES->value->cstring);
+		//APP_LOG(APP_LOG_LEVEL_DEBUG, "Tide Heights: %s",tides_buffer);
+		
+		for (int i=0; i<48; i+=2) {
+			settings.tides_storage[i/2] = (tides_buffer[i]-'0')*10+(tides_buffer[i+1]-'0');
+			settings.updated = true;
+			update = true;
+		}
+	}
+	else if (settings.updated && (settings.last_poll != s_last_poll)) {
+		settings.updated = false;
 	}
 	
 	if (update) {
 		config_save_settings();
 		s_connected = connection_service_peek_pebble_app_connection();
 		battery_callback(battery_state_service_peek());
-		health_callback(health_service_peek_current_activities(), NULL);
 		battery_update_proc();
 		bluetooth_update_proc();
+		#if defined(PBL_HEALTH)
+		health_callback(health_service_peek_current_activities(), NULL);
 		health_update_proc();
+		#endif
 	}
 }
 
@@ -316,8 +332,9 @@ static void inbox_loader() {
 	
 	// Open AppMessage
 	const int inbox_size = 128;
-	const int outbox_size = 128;
+	const int outbox_size = 132;
 	app_message_open(inbox_size, outbox_size);
+	//app_message_open(app_message_inbox_size_maximum(), app_message_outbox_size_maximum());
 }
 
 // JAVA INBOX UPDATER
@@ -336,8 +353,10 @@ static void tick_handler(struct tm* tick_time, TimeUnits units_changed) {
 	// Update once per minute
 	if(tick_time->tm_sec == 0) {
     update_time();
+		#if defined(PBL_HEALTH)
 		health_callback(health_service_peek_current_activities(), NULL);
 		health_update_proc();
+		#endif
   }
 		
 	// Update on change
@@ -377,7 +396,7 @@ static void draw_bar(int width, int current, int upper, Layer *layer, GContext *
   graphics_fill_rect(ctx, GRect(2, 2, width, bounds.size.h), 0, GCornerNone);
 }
 
-// DRAW INDIVIDUAL BARS
+// DRAW INDIVIDUAL STAT BARS
 static void draw_batterybar(Layer *layer, GContext *ctx){
 	draw_bar(battery_bar_width,s_battery_level,100,layer,ctx);
 }
@@ -392,25 +411,66 @@ static void draw_stepsbar(Layer *layer, GContext *ctx){
 static void graphics_loader(GRect frame) {
 	// Draw Bluetooth icon
 	s_bluetooth_bitmap = gbitmap_create_with_resource(RESOURCE_ID_BLUETOOTH_ICON);
-	s_bluetooth_bitlayer = bitmap_layer_create(GRect(94, 10, frame.size.w, 100));
+	s_bluetooth_bitlayer = bitmap_layer_create(GRect(-9, 45, frame.size.w, 12));
   bitmap_layer_set_bitmap(s_bluetooth_bitlayer, s_bluetooth_bitmap);
-  bitmap_layer_set_alignment(s_bluetooth_bitlayer, GAlignCenter);
+  bitmap_layer_set_alignment(s_bluetooth_bitlayer, GAlignRight);
 	
-	// Create Time child layer
-	s_time_layer = text_layer_create(GRect(0, 0, frame.size.w , 36));
+	// Create time child layer
+	s_time_layer = text_layer_create(GRect(0, -6, frame.size.w , 36));
   text_layer_set_text_color(s_time_layer, GColorWhite);
   text_layer_set_background_color(s_time_layer, GColorClear);
   text_layer_set_font(s_time_layer, fonts_get_system_font(FONT_KEY_LECO_36_BOLD_NUMBERS));
   text_layer_set_text_alignment(s_time_layer, GTextAlignmentLeft);
+	text_layer_set_text(s_time_layer, "00:00");
 	
-	// Create Date child layer
-	s_date_layer = text_layer_create(GRect(0, 38, frame.size.w, 34));
+	// Create day child layer
+	s_day_layer = text_layer_create(GRect(2, 27, frame.size.w, 34));
+  text_layer_set_text_color(s_day_layer, GColorWhite);
+  text_layer_set_background_color(s_day_layer, GColorClear);
+  text_layer_set_font(s_day_layer, fonts_get_system_font(FONT_KEY_GOTHIC_14));
+  text_layer_set_text_alignment(s_day_layer, GTextAlignmentLeft);
+  text_layer_set_text(s_day_layer, "TODAY");
+	
+	// Create date child layer
+	s_date_layer = text_layer_create(GRect(2, 38, frame.size.w, 34));
   text_layer_set_text_color(s_date_layer, GColorWhite);
   text_layer_set_background_color(s_date_layer, GColorClear);
   text_layer_set_font(s_date_layer, fonts_get_system_font(FONT_KEY_LECO_20_BOLD_NUMBERS));
-  text_layer_set_text_alignment(s_date_layer, GTextAlignmentCenter);
-  text_layer_set_text(s_date_layer, "1-1-2013");
+  text_layer_set_text_alignment(s_date_layer, GTextAlignmentLeft);
+  text_layer_set_text(s_date_layer, "00-00-0000");
 	
+	// Create location child layer
+	s_loc_layer = text_layer_create(GRect(2, 55, frame.size.w, 34));
+  text_layer_set_text_color(s_loc_layer, GColorWhite);
+  text_layer_set_background_color(s_loc_layer, GColorClear);
+  text_layer_set_font(s_loc_layer, fonts_get_system_font(FONT_KEY_GOTHIC_14));
+  text_layer_set_text_alignment(s_loc_layer, GTextAlignmentLeft);
+	text_layer_set_text(s_loc_layer, "Location");
+	
+	// Create weather child layer
+	s_lvl_layer = text_layer_create(GRect(2, 67, frame.size.w, 34));
+  text_layer_set_text_color(s_lvl_layer, GColorWhite);
+  text_layer_set_background_color(s_lvl_layer, GColorClear);
+  text_layer_set_font(s_lvl_layer, fonts_get_system_font(FONT_KEY_GOTHIC_14));
+  text_layer_set_text_alignment(s_lvl_layer, GTextAlignmentLeft);
+	text_layer_set_text(s_lvl_layer, "Weather");
+
+	// Create high tide child layer
+	s_hitide_layer = text_layer_create(GRect(0, 55, frame.size.w, 34));
+  text_layer_set_text_color(s_hitide_layer, GColorWhite);
+  text_layer_set_background_color(s_hitide_layer, GColorClear);
+  text_layer_set_font(s_hitide_layer, fonts_get_system_font(FONT_KEY_GOTHIC_14));
+  text_layer_set_text_alignment(s_hitide_layer, GTextAlignmentRight);
+	text_layer_set_text(s_hitide_layer, "H: 00:00");
+	
+	// Create low tide child layer
+	s_lotide_layer = text_layer_create(GRect(0, 67, frame.size.w, 34));
+  text_layer_set_text_color(s_lotide_layer, GColorWhite);
+  text_layer_set_background_color(s_lotide_layer, GColorClear);
+  text_layer_set_font(s_lotide_layer, fonts_get_system_font(FONT_KEY_GOTHIC_14));
+  text_layer_set_text_alignment(s_lotide_layer, GTextAlignmentRight);
+	text_layer_set_text(s_lotide_layer, "L: 00:00");
+
 	// Create battery text child layer
 	s_battery_layer = text_layer_create(GRect((battery_bar_width+2)*-1, 0, frame.size.w, 34));
   text_layer_set_text_color(s_battery_layer, GColorWhite);
@@ -435,26 +495,50 @@ static void graphics_loader(GRect frame) {
   text_layer_set_text_alignment(s_nextLvl_layer, GTextAlignmentRight);
   text_layer_set_text(s_nextLvl_layer, "00000");
 		
-	// Create weather child layer
-	s_loc_layer = text_layer_create(GRect(0, 59, frame.size.w, 34));
-  text_layer_set_text_color(s_loc_layer, GColorWhite);
-  text_layer_set_background_color(s_loc_layer, GColorClear);
-  text_layer_set_font(s_loc_layer, fonts_get_system_font(FONT_KEY_GOTHIC_14));
-  text_layer_set_text_alignment(s_loc_layer, GTextAlignmentCenter);
-	text_layer_set_text(s_loc_layer, "Location");
-	
-	// Create weather child layer
-	s_lvl_layer = text_layer_create(GRect(0, 71, frame.size.w, 34));
-  text_layer_set_text_color(s_lvl_layer, GColorWhite);
-  text_layer_set_background_color(s_lvl_layer, GColorClear);
-  text_layer_set_font(s_lvl_layer, fonts_get_system_font(FONT_KEY_GOTHIC_14));
-  text_layer_set_text_alignment(s_lvl_layer, GTextAlignmentCenter);
-	text_layer_set_text(s_lvl_layer, "Temp and Conditions");
-
 	// Create bar layers
 	s_batterybar_layer = layer_create(GRect(frame.size.w-battery_bar_width, 5, battery_bar_width, 9));
 	s_stepsbar_layer = layer_create(GRect(frame.size.w-steps_bar_width, 18, steps_bar_width, 9));
 	s_sleepbar_layer = layer_create(GRect(frame.size.w-sleep_bar_width, 31, sleep_bar_width, 9));
+}
+
+// CANVAS UPDATE PROCESS
+static void canvas_update_proc(Layer *layer, GContext *ctx) {
+	GRect frame = layer_get_bounds(layer);
+	int bottom_buffer = 2;
+	int tide_bar_height = 0;
+	int max = settings.tides_storage[0];
+	
+	time_t temp = time(NULL);
+  struct tm *tick_time = localtime(&temp);
+
+  // Write the current hours and minutes into a buffer
+  static char s_buffer[8];
+  strftime(s_buffer, sizeof(s_buffer), "%H", tick_time);
+	int hour_now = ((s_buffer[0]-'0')*10)+(s_buffer[1]-'0');
+
+	for (int m=0; m<24; m++) {
+		if (max < settings.tides_storage[m]) {
+			max = settings.tides_storage[m];
+			s_tides_hi = m;
+		}
+	}
+	
+	graphics_context_set_stroke_color(ctx, GColorWhite);
+	graphics_draw_rect(ctx, GRect(0, tide_box_height, frame.size.w, frame.size.h-tide_box_height-bottom_buffer));
+	
+	for (int x=0; x<24; x++) {
+		tide_bar_height = ((settings.tides_storage[x] * tide_box_height) / max);
+  	graphics_context_set_fill_color(ctx, GColorWhite);		
+		graphics_fill_rect(ctx, GRect(x*(tide_bar_width+1)+1, frame.size.h-tide_bar_height-bottom_buffer, tide_bar_width, tide_bar_height),0,GCornerNone);
+		if (x == hour_now) {
+			GPoint start = GPoint(x*(tide_bar_width+1)+1, tide_box_height);
+			GPoint end = GPoint(x*(tide_bar_width+1)+1, frame.size.h-bottom_buffer-2);
+			graphics_draw_line(ctx, start, end);
+			start = GPoint(x*(tide_bar_width+1)+tide_bar_width, tide_box_height);
+			end = GPoint(x*(tide_bar_width+1)+tide_bar_width, frame.size.h-bottom_buffer-2);
+			graphics_draw_line(ctx, start, end);
+		}
+	}
 }
 
 // WINDOW : LOAD
@@ -465,15 +549,18 @@ static void main_window_load(Window *window) {
   // Get information about the Window
   Layer *window_layer = window_get_root_layer(window);
 
-	// Create window and load graphics
+	// Create window
   GRect frame = layer_get_bounds(window_layer);
 	s_canvas_layer = layer_create(frame);
-	graphics_loader(frame);  
+	
+	// Load graphics
+	graphics_loader(frame);
 	
 	layer_add_child(s_canvas_layer, s_batterybar_layer);
 	layer_add_child(s_canvas_layer, s_sleepbar_layer);
 	layer_add_child(s_canvas_layer, s_stepsbar_layer);
 	
+	layer_set_update_proc(s_canvas_layer, canvas_update_proc);
 	layer_set_update_proc(s_batterybar_layer, draw_batterybar);
 	layer_set_update_proc(s_sleepbar_layer, draw_sleepbar);
 	layer_set_update_proc(s_stepsbar_layer, draw_stepsbar);
@@ -482,16 +569,17 @@ static void main_window_load(Window *window) {
 
 	layer_add_child(window_layer, text_layer_get_layer(s_time_layer));
   layer_add_child(window_layer, text_layer_get_layer(s_battery_layer));
+	layer_add_child(window_layer, text_layer_get_layer(s_day_layer));
 	layer_add_child(window_layer, text_layer_get_layer(s_date_layer));
 	layer_add_child(window_layer, text_layer_get_layer(s_xp_layer)); // Current steps
 	layer_add_child(window_layer, text_layer_get_layer(s_nextLvl_layer)); // Weekly step average
-	layer_add_child(window_layer, text_layer_get_layer(s_lvl_layer)); // Weather
+	layer_add_child(window_layer, text_layer_get_layer(s_lvl_layer)); // Location
 	layer_add_child(window_layer, text_layer_get_layer(s_loc_layer)); // Weather
 	
-	layer_add_child(window_layer, s_canvas_layer);
+	// Add to Window
+	layer_add_child(window_get_root_layer(window), s_canvas_layer);
 	
 	layer_mark_dirty(s_canvas_layer);
-	layer_mark_dirty(window_layer);
 }
 
 // WINDOW : UNLOAD
@@ -503,11 +591,14 @@ static void main_window_unload(Window *window) {
 
   text_layer_destroy(s_time_layer);
   text_layer_destroy(s_battery_layer);
+	text_layer_destroy(s_day_layer);
 	text_layer_destroy(s_date_layer);
 	text_layer_destroy(s_xp_layer);
 	text_layer_destroy(s_nextLvl_layer);
 	text_layer_destroy(s_lvl_layer);
 	text_layer_destroy(s_loc_layer);
+	text_layer_destroy(s_hitide_layer);
+	text_layer_destroy(s_lotide_layer);
 	
 	layer_destroy(s_batterybar_layer);
 	layer_destroy(s_sleepbar_layer);
@@ -531,17 +622,22 @@ static void init(void) {
 	s_next_level = settings.steps_count;
 	s_head_level = 0;
 	s_headmax_level = settings.sleep_count;
+	s_tides_hi = 0;
 	
 	// Subscribe to services
   battery_state_service_subscribe(battery_callback);
 	connection_service_subscribe((ConnectionHandlers) {.pebble_app_connection_handler = bluetooth_callback});
+	#if defined(PBL_HEALTH)
 	health_service_events_subscribe(health_callback, NULL);
+	#endif
 	tick_timer_service_subscribe(SECOND_UNIT, tick_handler);
 	
 	// Peek at services
 	s_connected = connection_service_peek_pebble_app_connection();
 	battery_callback(battery_state_service_peek());
+	#if defined(PBL_HEALTH)
 	health_callback(health_service_peek_current_activities(), NULL);
+	#endif
 	
 	// Create main window element and assign to pointer
   s_main_window = window_create();
@@ -556,7 +652,9 @@ static void init(void) {
 	update_time();
 	battery_update_proc();
 	bluetooth_update_proc();
+	#if defined(PBL_HEALTH)
 	health_update_proc();
+	#endif
 }
 
 // DEINITIALIZE
@@ -564,6 +662,9 @@ static void deinit(void) {
   tick_timer_service_unsubscribe();
   battery_state_service_unsubscribe();
   bluetooth_connection_service_unsubscribe();
+	#if defined(PBL_HEALTH)
+	health_service_events_unsubscribe();
+	#endif
   window_destroy(s_main_window);
 }
 
